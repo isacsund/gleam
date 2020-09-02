@@ -1,0 +1,106 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+jobs:
+  test:
+    name: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        toolchain: [stable]
+        build: [linux, macos, win]
+        include:
+        - build: linux
+          os: ubuntu-latest
+        - build: macos
+          os: macos-latest
+        - build: win
+          os: windows-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: ${{ matrix.toolchain }}
+        profile: minimal
+        override: true
+
+    - name: Cache Rust dependencies 
+      uses: actions/cache@v2
+      with:
+        path: target
+        key: ${{ runner.os }}-cargo-test-${{ matrix.toolchain }}-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Build binary
+      run: cargo build --release
+      env:
+        CARGO_INCREMENTAL: 0
+        RUSTFLAGS: "-C debuginfo=0 -D warnings"
+
+    - name: Run tests
+      run: cargo test --workspace
+      env:
+        CARGO_INCREMENTAL: 0
+        RUSTFLAGS: "-C debuginfo=0 -D warnings"
+
+    - name: Upload artifact (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      uses: actions/upload-artifact@v2
+      with:
+        name: gleam
+        path: target/release/gleam
+
+  rustfmt:
+    name: rustfmt
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        profile: minimal
+        components: rustfmt
+
+    - name: Check formatting
+      run: cargo fmt --all -- --check
+
+  test-core-language:
+    name: test-core-language
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2.0.0
+
+    - name: Install Erlang
+      uses: gleam-lang/setup-erlang@v1.1.0
+      with:
+        otp-version: 22.1
+
+    - name: Download test artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: gleam
+        path: ./test/core_language
+
+    # Artifacts remove permissions
+    - name: Setup gleam compiler
+      run: |
+        chmod +x ./gleam
+        sed -i 's/cargo run --/.\/gleam/' rebar.config
+      working-directory: ./test/core_language
+
+    - run: rebar3 install_deps
+      working-directory: ./test/core_language
+
+    - run: rebar3 eunit
+      working-directory: ./test/core_language
