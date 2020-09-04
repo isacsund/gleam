@@ -1,0 +1,106 @@
+name: release
+on:
+  push:
+    tags:
+      - 'v*'
+jobs:
+  create-release:
+    name: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create artifacts directory
+        run: mkdir artifacts
+
+      - name: Create GitHub release
+        id: release
+        uses: actions/create_release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: ${{ github.ref }}
+
+      - name: Save release upload URL to artifact
+        run: echo "${{ steps.release.outputs.upload_url }}" > artifacts/release-upload-url
+
+      - name: Save version number to artifact
+        run: echo "${{ github.ref }}" > artifacts/release-version
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: artifacts
+          path: artifacts
+
+  build-release:
+    name: build-release
+    needs: ['create_release']
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        build: [linux-amd64, macos, windows-64bit]
+        toolchain: [stable]
+        include:
+        - build: linux-amd64
+          os: ubuntu-latest
+        - build: macos
+          os: macos-latest
+        - build: windows-64bit
+          os: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          override: true
+          profile: minimal
+
+      - name: Get release download URL
+        uses: actions/download-artifact@v2
+        with:
+          name: artifacts
+          path: artifacts
+
+      - name: Set release upload URL and release version
+        shell: bash
+        run: |
+          release_upload_url="$(cat artifacts/release-upload-url)"
+          echo "::set-env name=RELEASE_UPLOAD_URL::$release_upload_url"
+          echo "release upload url: $RELEASE_UPLOAD_URL"
+          release_version="$(cat artifacts/release-version)"
+          echo "::set-env name=RELEASE_VERSION::$release_version"
+          echo "release version: $RELEASE_VERSION"
+
+      - name: Build release binary
+        run: cargo build --release
+        env:
+          CARGO_INCREMENTAL: 0
+          RUSTFLAGS: "-C debuginfo=0 -D warnings"
+
+      - name: Build archive
+        shell: bash
+        run: |
+          staging="gleam-${{ env.RELEASE_VERSION }}-${{ matrix.build }}"
+
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            cp "target/release/gleam.exe" "$staging/"
+            7z a "$staging.zip" "$staging"
+            echo "::set-env name=ASSET::$staging.zip"
+          else
+            cp "target/release/gleam" "$staging/"
+            tar -czvf "$staging.tar.gz" "$staging"
+            echo "::set-env name=ASSET::$staging.tar.gz"
+          fi
+
+      - name: Upload release archive
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ env.RELEASE_UPLOAD_URL }}
+          asset_path: ${{ env.ASSET }}
+          asset_name: ${{ env.ASSET }}
+          asset_content_type: application/gzip
