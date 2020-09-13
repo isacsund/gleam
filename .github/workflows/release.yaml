@@ -76,9 +76,6 @@ jobs:
 
       - name: Build release binary
         run: cargo build --release
-        env:
-          CARGO_INCREMENTAL: 0
-          RUSTFLAGS: "-C debuginfo=0 -D warnings"
 
       - name: Build archive
         shell: bash

@@ -38,15 +38,9 @@ jobs:
 
     - name: Build binary
       run: cargo build --release
-      env:
-        CARGO_INCREMENTAL: 0
-        RUSTFLAGS: "-C debuginfo=0 -D warnings"
 
     - name: Run tests
       run: cargo test --workspace
-      env:
-        CARGO_INCREMENTAL: 0
-        RUSTFLAGS: "-C debuginfo=0 -D warnings"
 
     - name: Upload artifact (Ubuntu)
       if: matrix.os == 'ubuntu-latest'
