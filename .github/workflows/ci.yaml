@@ -11,14 +11,20 @@ jobs:
     strategy:
       matrix:
         toolchain: [stable]
-        build: [linux, macos, win]
+        build: [linux, linux-musl, macos, win]
         include:
         - build: linux
           os: ubuntu-latest
+          target: x86_64-unknown-linux-gnu
+        - build: linux-musl
+          os: ubuntu-latest
+          target: x86_64-unknown-linux-musl
         - build: macos
           os: macos-latest
+          target: x86_64-apple-darwin
         - build: win
           os: windows-latest
+          target: x84_64-pc-windows-msvc
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
@@ -29,6 +35,7 @@ jobs:
         toolchain: ${{ matrix.toolchain }}
         profile: minimal
         override: true
+        target: ${{ matrix.target }}
 
     - name: Cache Rust dependencies 
       uses: actions/cache@v2
@@ -43,7 +50,7 @@ jobs:
       run: cargo test --workspace
 
     - name: Upload artifact (Ubuntu)
-      if: matrix.os == 'ubuntu-latest'
+      if: matrix.build == 'linux'
       uses: actions/upload-artifact@v2
       with:
         name: gleam

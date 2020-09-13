@@ -38,15 +38,18 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        build: [linux-amd64, macos, windows-64bit]
+        build: [linux, macos, win-msvc]
         toolchain: [stable]
         include:
-        - build: linux-amd64
+        - build: linux
           os: ubuntu-latest
+          target: x86_64-unknown-linux-musl
         - build: macos
           os: macos-latest
-        - build: windows-64bit
+          target: x86_64-apple-darwin
+        - build: win-msvc
           os: windows-latest
+          target: x86_64-pc-windows-msvc
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -57,6 +60,7 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
           override: true
           profile: minimal
+          target: ${{ matrix.target }}
 
       - name: Get release download URL
         uses: actions/download-artifact@v2
@@ -75,7 +79,7 @@ jobs:
           echo "release version: $RELEASE_VERSION"
 
       - name: Build release binary
-        run: cargo build --release
+        run: cargo build --release --target ${{ matrix.target }}
 
       - name: Build archive
         shell: bash
@@ -83,11 +87,11 @@ jobs:
           staging="gleam-${{ env.RELEASE_VERSION }}-${{ matrix.build }}"
 
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            cp "target/release/gleam.exe" "$staging/"
+            cp "target/${{ matrix.target }}/release/gleam.exe" "$staging/"
             7z a "$staging.zip" "$staging"
             echo "::set-env name=ASSET::$staging.zip"
           else
-            cp "target/release/gleam" "$staging/"
+            cp "target/${{ matrix.target }}/release/gleam" "$staging/"
             tar -czvf "$staging.tar.gz" "$staging"
             echo "::set-env name=ASSET::$staging.tar.gz"
           fi
