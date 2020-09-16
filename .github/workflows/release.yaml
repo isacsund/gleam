@@ -19,40 +19,43 @@ jobs:
 
   build-release:
     name: build-release
-    needs: create_release
+    needs: create-release
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        build: [linux, macos, win-msvc]
+        build: [linux, macos, win]
         toolchain: [stable]
         include:
         - build: linux
           os: ubuntu-latest
           target: x86_64-unknown-linux-musl
+          use-cross: true
         - build: macos
           os: macos-latest
           target: x86_64-apple-darwin
-        - build: win-msvc
+          use-cross: false
+        - build: win
           os: windows-latest
           target: x86_64-pc-windows-msvc
+          use-cross: false
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-
-      - name: Install packages (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get update; sudo apt-get install --no-install-recommends musl-tools
 
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.toolchain }}
-          override: true
-          profile: minimal
           target: ${{ matrix.target }}
+          profile: minimal
+          override: true
 
       - name: Build release binary
-        run: cargo build --release --target ${{ matrix.target }}
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: ${{ matrix.use-cross }}
+          command: build
+          args: --release --target ${{ matrix.target }}
 
       - name: Build archive
         shell: bash
