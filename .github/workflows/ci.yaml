@@ -41,12 +41,6 @@ jobs:
         profile: minimal
         override: true
 
-    - name: Cache Rust dependencies 
-      uses: actions/cache@v2
-      with:
-        path: target
-        key: ${{ runner.os }}-cargo-test-${{ matrix.toolchain }}-${{ hashFiles('**/Cargo.lock') }}
-
     - name: Build binary
       uses: actions-rs/cargo@v1
       with:
