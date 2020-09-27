@@ -65,6 +65,7 @@ jobs:
         run: |
           VERSION="${GITHUB_REF#refs/tags/}"
           staging="gleam-$VERSION-${{ matrix.build }}"
+          mkdir -p "$staging"
 
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
             cp "target/${{ matrix.target }}/release/gleam.exe" "$staging/"
